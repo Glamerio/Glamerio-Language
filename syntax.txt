@@ -1,0 +1,141 @@
+# =========================================
+#              Glamerio Language
+#           Syntax Definition File
+# =========================================
+
+# -------------------------------
+# LANGUAGE INFO
+# -------------------------------
+# Language Name   : Glamerio
+# File Extension  : .gl
+# Single-line Comment : starts with #
+# Inline comment        : ends with #
+# Statement End         : every line ends with ;
+
+# -------------------------------
+# DATA TYPES
+# -------------------------------
+int      # Integer
+float    # Floating point number
+string   # Text
+bool     # Boolean (True / False)
+
+# -------------------------------
+# SPECIAL VALUES
+# -------------------------------
+Null     # Null value
+True     # Boolean true
+False    # Boolean false
+\n       # Newline character in strings
+
+# -------------------------------
+# VARIABLE DECLARATION
+# -------------------------------
+int x = 5;
+float y = 3.14;
+string z = "Hello";
+bool b = True;
+
+# -------------------------------
+# INPUT / OUTPUT
+# -------------------------------
+input();                             # Get user input
+string name = input("What is your name?");  # Prompted input
+
+print(x);                            # Print to screen
+print("Hello " + name + "!");        # String concatenation
+
+# -------------------------------
+# ARITHMETIC OPERATORS
+# -------------------------------
++  # Addition
+-  # Subtraction
+*  # Multiplication
+/  # Division
+
+# -------------------------------
+# COMPARISON OPERATORS
+# -------------------------------
+==  # Equal
+!=  # Not equal
+<   # Less than
+>   # Greater than
+<=  # Less than or equal
+>=  # Greater than or equal
+
+# -------------------------------
+# CONDITIONAL STATEMENTS
+# -------------------------------
+if (x > 10) {
+    print("Greater");
+} else if (x == 10) {
+    print("Equal");
+} else {
+    print("Smaller");
+}
+
+# -------------------------------
+# LOOPS
+# -------------------------------
+# You can define a new variable directly in the condition
+while (int i < 5) {
+    print(i);
+    i = i + 1;
+}
+
+# For loop: init, condition, increment
+for (int i = 0; i < 10; i++) {
+    print(i);
+}
+
+# -------------------------------
+# FUNCTIONS
+# -------------------------------
+fn add(a, b) {
+    return a + b;
+}
+
+int result = add(3, 5);
+print(result);
+
+# -------------------------------
+# CLASSES
+# -------------------------------
+class Car {
+    string brand;
+    int speed = 0;
+
+    fn accelerate() {
+        speed = speed + 10;
+    }
+
+    fn showInfo() {
+        print("Brand: " + brand + ", Speed: " + speed);
+    }
+}
+
+# Object creation and usage
+Car c;
+c.brand = "Toyota";
+c.accelerate();
+c.showInfo();
+
+# -------------------------------
+# OBJECT REFERENCE
+# -------------------------------
+this.brand = "BMW";  # Accessing member inside the class
+
+# -------------------------------
+# OTHER EXAMPLES
+# -------------------------------
+# Re-assigning a variable
+x = 15;
+
+# Variable inside function
+fn greet(name) {
+    string message = "Hello " + name;
+    print(message);
+}
+
+# Returning a value
+return message;
