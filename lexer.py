@@ -17,14 +17,14 @@ TOKENS = [
     # Identifiers (variables, function names, etc.)
     ('ID', r'[a-zA-Z_][a-zA-Z0-9_]*'),
 
-    # Numbers (int or float)
+    # Numbers (integers and floats)
     ('NUMBER', r'\d+(\.\d+)?'),
 
     # Strings
     ('STRING', r'"[^"\n]*"'),
 
     # Operators
-    ('OP', r'==|!=|<=|>=|=|<|>|\+|\-|\*|\/'),
+    ('OP', r'\^|==|!=|<=|>=|=|<|>|\+|\-|\*|\/'),
 
     # Symbols
     ('LPAREN', r'\('),
@@ -35,32 +35,41 @@ TOKENS = [
     ('COMMA', r','),
     ('DOT', r'\.'),
 
-    # Whitespace and comments
+    # Whitespace and comments (ignored)
     ('NEWLINE', r'\n'),
     ('SKIP', r'[ \t]+'),
     ('COMMENT', r'\#.*')
 ]
-# Compile the regular expressions for each token type
-TOKEN_RE = re.compile('|'.join(f'(?P<{name}>{regex})' for name, regex in TOKENS))
 
-# Lexer function that takes a string of code and returns a list of tokens
+# Compile all regexes into a single pattern
+TOKEN_RE = re.compile('|'.join(f'(?P<{name}>{pattern})' for name, pattern in TOKENS))
+
+# Lexer function
 def lexer(code):
     tokens = []
-    for mo in TOKEN_RE.finditer(code):
-        kind = mo.lastgroup
-        value = mo.group()
+    for match in TOKEN_RE.finditer(code):
+        kind = match.lastgroup
+        value = match.group()
+
+        # Skip whitespace, newlines, and comments
         if kind in ('NEWLINE', 'SKIP', 'COMMENT'):
             continue
-        elif kind == 'STRING':
-            value  = value[1:-1] # remove quotes
+
+        # Remove quotes from strings
+        if kind == 'STRING':
+            value = value[1:-1]
+
         tokens.append((kind, value))
+
     return tokens
 
-# Example usage:
+# Example usage: run with test file
 if __name__ == "__main__":
-    with open('program.gl', 'r') as f:
-        code = f.read()
-    token_list = lexer(code)
-    for token in token_list:
-        print(token)
-# Example code to test the lexer
+    try:
+        with open('program.gl', 'r', encoding='utf-8') as f:
+            code = f.read()
+        token_list = lexer(code)
+        for token in token_list:
+            print(token)
+    except FileNotFoundError:
+        print("Error: 'program.gl' file not found.")

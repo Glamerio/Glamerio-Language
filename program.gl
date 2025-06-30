@@ -1,3 +1,2 @@
-while (int b < 10) {
-    print(b);b = b + 1;
-}
+int x = 2;
+print(x * 3);

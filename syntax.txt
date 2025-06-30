@@ -17,7 +17,7 @@
 # -------------------------------
 int      # Integer
 float    # Floating point number
-string   # Text
+string   # A universe where String is a variable type :)
 bool     # Boolean (True / False)
 
 # -------------------------------
