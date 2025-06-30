@@ -280,6 +280,24 @@ def parse_program(tokens):
         elif token[0] == 'KEYWORD' and token[1] == 'print':
             node = parse_print_statement(stream)
             ast_nodes.append(node)
+        elif token[0] == 'KEYWORD' and token[1] == 'input':
+            node = parse_input_statement(stream)
+            ast_nodes.append(node)
+        elif token[0] == 'KEYWORD' and token[1] == 'if':
+            node = parse_if_statement(stream)
+            ast_nodes.append(node)
+        elif token[0] == 'KEYWORD' and token[1] == 'while':
+            node = parse_while_statement(stream)
+            ast_nodes.append(node)
+        elif token[0] == 'KEYWORD' and token[1] == 'return':
+            node = parse_return_statement(stream)
+            ast_nodes.append(node)
+        elif token[0] == 'KEYWORD' and token[1] == 'fn':
+            node = parse_function_definition(stream)
+            ast_nodes.append(node)
+        elif token[0] == 'ID' and stream.tokens[stream.position+1][0] == 'LPAREN':
+            node = parse_function_call(stream)
+            ast_nodes.append(node)
         else:
             raise Exception(f"Unexpected token: {token}")
 
