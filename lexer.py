@@ -8,7 +8,7 @@ TOKENS = [
     ('KEYWORD', r'\b(fn|if|else|for|while|class|return|input|print|this)\b'),
 
     # Data types
-    ('TYPE', r'\b(int|float|string|bool)\b'),
+    ('TYPE', r'\b(int|float|str|bool)\b'),
 
     # Boolean & null values
     ('BOOL', r'\b(True|False)\b'),
@@ -23,17 +23,21 @@ TOKENS = [
     # Strings
     ('STRING', r'"[^"\n]*"'),
 
-    # Operators
-    ('OP', r'\^|==|!=|<=|>=|=|<|>|\+|\-|\*|\/'),
-
     # Symbols
+    ('SEMI', r';'),
+    ('COMMA', r','),
+    ('DOT', r'\.'),
     ('LPAREN', r'\('),
     ('RPAREN', r'\)'),
     ('LBRACE', r'\{'),
     ('RBRACE', r'\}'),
-    ('SEMI', r';'),
-    ('COMMA', r','),
-    ('DOT', r'\.'),
+    
+    ('LBRACKET', r'\['),
+    ('RBRACKET', r'\]'),
+    
+    # Operators
+    ('OP', r'\^|==|!=|<=|>=|=|<|>|\+|\-|\*|\/'),
+
 
     # Whitespace and comments (ignored)
     ('NEWLINE', r'\n'),

@@ -85,19 +85,40 @@ class FunctionCallNode:
 class ReturnNode:
     def __init__(self, value):
         self.value = value
+        
+class ForNode:
+    def __init__(self, init, condition, increment, body):
+        self.init = init            # VarDeclarationNode or Expression
+        self.condition = condition  # Expression
+        self.increment = increment  # Expression
+        self.body = body            # BlockNode
 
 # ----------------------
 # Expression Parsers (with precedence)
 # ----------------------
 
+
+# Comparison precedence: <, >, <=, >=, ==, !=
+def parse_comparison(stream):
+    left = parse_additive(stream)
+    while stream.peek() and stream.peek()[0] == 'OP' and stream.peek()[1] in ('<', '>', '<=', '>=', '==', '!='):
+        op = stream.consume()[1]
+        right = parse_additive(stream)
+        left = BinaryOpNode(left, op, right)
+    return left
+
 # Lowest precedence: + -
-def parse_expression(stream):
+def parse_additive(stream):
     left = parse_term(stream)
     while stream.peek() and stream.peek()[0] == 'OP' and stream.peek()[1] in ('+', '-'):
         op = stream.consume()[1]
         right = parse_term(stream)
         left = BinaryOpNode(left, op, right)
     return left
+
+# parse_expression now starts with comparison
+def parse_expression(stream):
+    return parse_comparison(stream)
 
 # Medium precedence: * /
 def parse_term(stream):
@@ -118,6 +139,13 @@ def parse_power(stream):
         left = BinaryOpNode(left, op, right)
     return left
 
+def parse_input_expression(stream):
+    stream.consume('KEYWORD')  # 'input'
+    stream.consume('LPAREN')
+    prompt = parse_expression(stream)
+    stream.consume('RPAREN')
+    return InputNode(prompt)
+
 # Highest level: numbers, identifiers, parentheses
 def parse_factor(stream):
     token = stream.peek()
@@ -126,12 +154,19 @@ def parse_factor(stream):
         expr = parse_expression(stream)
         stream.consume('RPAREN')
         return expr
+    elif token[0] == 'BOOL':
+        return LiteralNode(stream.consume()[1])  # 'True' or 'False'
+    elif token[0] == 'NULL':
+        stream.consume()
+        return LiteralNode('null')
     elif token[0] == 'NUMBER':
         return LiteralNode(stream.consume()[1])
     elif token[0] == 'STRING':
         return StringNode(stream.consume()[1])
     elif token[0] == 'ID':
         return IdentifierNode(stream.consume()[1])
+    elif token[0] == 'KEYWORD' and token[1] == 'input':
+        return parse_input_expression(stream)
     else:
         raise Exception(f"Invalid factor: {token}")
 
@@ -155,13 +190,52 @@ def parse_print_statement(stream):
     stream.consume('SEMI')
     return PrintNode(value)
 
-def parse_input_statement(stream):
-    stream.consume('KEYWORD')  # 'input'
+def parse_variable_declaration_inline(stream):
+    var_type = stream.consume('TYPE')[1]
+    var_name = stream.consume('ID')[1]
+    op = stream.consume('OP')
+    if op[1] != '=':
+        raise Exception(f"Expected '=' in inline variable declaration, got {op[1]}")
+    value = parse_expression(stream)
+    return VarDeclarationNode(var_type, var_name, value)
+
+def parse_assignment_expression(stream):
+    # Assignment expression: ID = expr, right-associative
+    if stream.peek()[0] == 'ID':
+        # Lookahead for '='
+        if stream.position + 1 < len(stream.tokens) and stream.tokens[stream.position+1][0] == 'OP' and stream.tokens[stream.position+1][1] == '=':
+            name = stream.consume('ID')[1]
+            stream.consume('OP')  # '='
+            value = parse_assignment_expression(stream)
+            return BinaryOpNode(IdentifierNode(name), '=', value)
+    # Otherwise, fallback to normal expression
+    return parse_expression(stream)
+
+def parse_for_statement(stream):
+    stream.consume('KEYWORD')  # 'for'
     stream.consume('LPAREN')
-    prompt = parse_expression(stream)
-    stream.consume('RPAREN')
+
+    # INIT
+    if stream.peek()[0] == 'TYPE':
+        init = parse_variable_declaration_inline(stream)
+        stream.consume('SEMI')
+    else:
+        init = parse_assignment_expression(stream)
+        stream.consume('SEMI')
+
+    # CONDITION
+    condition = parse_expression(stream)
     stream.consume('SEMI')
-    return InputNode(prompt)
+
+    # INCREMENT
+    increment = parse_assignment_expression(stream)
+    stream.consume('RPAREN')
+
+    # BODY
+    body = parse_block(stream)
+
+    return ForNode(init, condition, increment, body)
+
 
 def parse_if_statement(stream):
     stream.consume('KEYWORD')  # 'if'
@@ -243,7 +317,7 @@ def parse_block(stream):
             node = parse_print_statement(stream)
             statements.append(node)
         elif token[0] == 'KEYWORD' and token[1] == 'input':
-            node = parse_input_statement(stream)
+            node = parse_input_expression(stream)
             statements.append(node)
         elif token[0] == 'KEYWORD' and token[1] == 'if':
             node = parse_if_statement(stream)
@@ -257,8 +331,27 @@ def parse_block(stream):
         elif token[0] == 'KEYWORD' and token[1] == 'fn':
             node = parse_function_definition(stream)
             statements.append(node)
-        elif token[0] == 'ID' and stream.tokens[stream.position+1][0] == 'LPAREN':
-            node = parse_function_call(stream)
+        elif token[0] == 'ID':
+            # Fonksiyon çağrısı mı yoksa atama mı?
+            if stream.position + 1 < len(stream.tokens):
+                next_token = stream.tokens[stream.position+1]
+                if next_token[0] == 'LPAREN':
+                    node = parse_function_call(stream)
+                    statements.append(node)
+                elif next_token[0] == 'OP' and next_token[1] == '=':
+                    # Atama statement'ı: x = expr;
+                    name = stream.consume('ID')[1]
+                    stream.consume('OP')  # '='
+                    value = parse_expression(stream)
+                    stream.consume('SEMI')
+                    node = BinaryOpNode(IdentifierNode(name), '=', value)
+                    statements.append(node)
+                else:
+                    raise Exception(f"Unexpected token in block: {token}, next: {next_token}")
+            else:
+                raise Exception(f"Unexpected token in block: {token}")
+        elif token[0] == 'KEYWORD' and token[1] == 'for':
+            node = parse_for_statement(stream)
             statements.append(node)
         else:
             raise Exception(f"Unexpected token in block: {token}")
@@ -281,10 +374,13 @@ def parse_program(tokens):
             node = parse_print_statement(stream)
             ast_nodes.append(node)
         elif token[0] == 'KEYWORD' and token[1] == 'input':
-            node = parse_input_statement(stream)
+            node = parse_input_expression(stream)
             ast_nodes.append(node)
         elif token[0] == 'KEYWORD' and token[1] == 'if':
             node = parse_if_statement(stream)
+            ast_nodes.append(node)
+        elif token[0] == 'KEYWORD' and token[1] == 'for':
+            node = parse_for_statement(stream)
             ast_nodes.append(node)
         elif token[0] == 'KEYWORD' and token[1] == 'while':
             node = parse_while_statement(stream)
