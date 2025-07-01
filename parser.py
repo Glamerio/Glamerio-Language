@@ -164,7 +164,24 @@ def parse_factor(stream):
     elif token[0] == 'STRING':
         return StringNode(stream.consume()[1])
     elif token[0] == 'ID':
-        return IdentifierNode(stream.consume()[1])
+        # Fonksiyon çağrısı mı, değişken mi?
+        if stream.position + 1 < len(stream.tokens) and stream.tokens[stream.position+1][0] == 'LPAREN':
+            # Fonksiyon çağrısı olarak parse et (ifade olarak)
+            name = stream.consume('ID')[1]
+            stream.consume('LPAREN')
+            args = []
+            if stream.peek()[0] != 'RPAREN':
+                while True:
+                    arg = parse_expression(stream)
+                    args.append(arg)
+                    if stream.peek()[0] == 'COMMA':
+                        stream.consume('COMMA')
+                    else:
+                        break
+            stream.consume('RPAREN')
+            return FunctionCallNode(name, args)
+        else:
+            return IdentifierNode(stream.consume()[1])
     elif token[0] == 'KEYWORD' and token[1] == 'input':
         return parse_input_expression(stream)
     else:
