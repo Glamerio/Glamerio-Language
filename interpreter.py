@@ -93,7 +93,11 @@ def evaluate(node, local_scope=None):
 
     elif isinstance(node, PrintNode):
         value = evaluate(node.value, scope)
-        print(value)
+        
+        if value is None:
+            print('null')
+        else:
+            print(value)
 
     elif isinstance(node, InputNode):
         prompt = evaluate(node.prompt, scope)

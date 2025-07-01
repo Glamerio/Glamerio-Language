@@ -12,7 +12,7 @@ TOKENS = [
 
     # Boolean & null values
     ('BOOL', r'\b(True|False)\b'),
-    ('NULL', r'\bNull\b'),
+    ('NULL', r'\bnull\b'),
 
     # Identifiers (variables, function names, etc.)
     ('ID', r'[a-zA-Z_][a-zA-Z0-9_]*'),
