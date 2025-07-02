@@ -19,7 +19,10 @@ def parse_try_catch_statement(stream):
             stream.consume('RPAREN')
         catch_block = parse_block(stream)
     else:
-        raise Exception('try bloğundan sonra catch bloğu bekleniyor!')
+        token = stream.peek()
+        line = token[2] if token and len(token) > 2 else '?'
+        column = token[3] if token and len(token) > 3 else '?'
+        raise Exception(f"[Line {line}, Column {column}] Syntax Error: 'catch' block expected after 'try'.")
     return TryCatchNode(try_block, catch_var, catch_block)
 # ----------------------
 # Class Instance Creation (new keyword)
@@ -48,9 +51,11 @@ class TokenStream:
     def consume(self, expected_type=None):
         token = self.peek()
         if token is None:
-            raise Exception("Unexpected end of input")
+            raise Exception(f"[Line ?, Column ?] Unexpected end of input (probably missing a closing bracket or statement)")
+        line = token[2] if len(token) > 2 else '?'
+        column = token[3] if len(token) > 3 else '?'
         if expected_type and token[0] != expected_type:
-            raise Exception(f"Expected token type {expected_type}, but got {token[0]}")
+            raise Exception(f"[Line {line}, Column {column}] Syntax Error: Expected token type '{expected_type}', but got '{token[0]}' (value: {token[1]})")
         self.position += 1
         return token
 
@@ -95,9 +100,14 @@ def parse_for_each_statement(stream):
                 stream.consume('SEMI')
                 stmt = expr
             else:
-                raise Exception(f"Unexpected token after inline for-each: {stream.peek()}")
+                token_err = stream.peek()
+                line = token_err[2] if token_err and len(token_err) > 2 else '?'
+                column = token_err[3] if token_err and len(token_err) > 3 else '?'
+                raise Exception(f"[Line {line}, Column {column}] Unexpected token after inline for-each: {token_err}")
         else:
-            raise Exception(f"Unsupported inline for-each statement: {token}")
+            line = token[2] if token and len(token) > 2 else '?'
+            column = token[3] if token and len(token) > 3 else '?'
+            raise Exception(f"[Line {line}, Column {column}] Unsupported inline for-each statement: {token}")
         body = BlockNode([stmt])
     return ForEachNode(var_type, var_name, iterable, body)
 
@@ -187,6 +197,64 @@ def parse_input_expression(stream):
 
 # Highest level: numbers, identifiers, parentheses
 def parse_factor(stream):
+    token = stream.peek()
+    if token[0] == 'LBRACE':
+        stream.consume('LBRACE')
+        pairs = []
+        while True:
+            token = stream.peek()
+            if token[0] == 'RBRACE':
+                break
+            key_token = stream.peek()
+            if key_token[0] == 'STRING':
+                key = stream.consume('STRING')[1]
+            elif key_token[0] == 'ID':
+                key = stream.consume('ID')[1]
+            else:
+                line = key_token[2] if len(key_token) > 2 else '?'
+                column = key_token[3] if len(key_token) > 3 else '?'
+                raise Exception(f"[Line {line}, Column {column}] Syntax Error: Map key must be string or identifier, got {key_token}")
+            stream.consume('COLON')
+            value = parse_expression(stream)
+            pairs.append((key, value))
+            token = stream.peek()
+            if token[0] == 'COMMA':
+                stream.consume('COMMA')
+            else:
+                break
+        stream.consume('RBRACE')
+        return MapNode(pairs)
+    token = stream.peek()
+    # Map/dictionary literal: {"key": value, ...}
+    if token[0] == 'LBRACE':
+        stream.consume('LBRACE')
+        pairs = []
+        while True:
+            token = stream.peek()
+            if token[0] == 'RBRACE':
+                break
+            # Key: string or identifier
+            key_token = stream.peek()
+            if key_token[0] == 'STRING':
+                key = stream.consume('STRING')[1]
+            elif key_token[0] == 'ID':
+                key = stream.consume('ID')[1]
+            else:
+                line = key_token[2] if len(key_token) > 2 else '?'
+                column = key_token[3] if len(key_token) > 3 else '?'
+                raise Exception(f"[Line {line}, Column {column}] Syntax Error: Map key must be string or identifier, got {key_token}")
+            stream.consume('COLON')
+            value = parse_expression(stream)
+            pairs.append((key, value))
+            token = stream.peek()
+            if token[0] == 'COMMA':
+                stream.consume('COMMA')
+            else:
+                break
+        stream.consume('RBRACE')
+        return MapNode(pairs)
+
+    # Her ana blok öncesi token güncelle
     token = stream.peek()
     # ...
     if token[0] == 'KEYWORD' and token[1] == 'this':
@@ -290,11 +358,13 @@ def parse_factor(stream):
         return StringNode(stream.consume()[1])
     elif token[0] == 'ID':
         # Property access: p.x
-        base = IdentifierNode(stream.consume('ID')[1])
+        id_token = stream.consume('ID')
+        base = IdentifierNode(id_token[1], id_token[2] if len(id_token) > 2 else None, id_token[3] if len(id_token) > 3 else None)
         while stream.peek() and stream.peek()[0] == 'DOT':
             stream.consume('DOT')
-            prop = stream.consume('ID')[1]
-            base = BinaryOpNode(base, '.', IdentifierNode(prop))
+            prop_token = stream.consume('ID')
+            prop_node = IdentifierNode(prop_token[1], prop_token[2] if len(prop_token) > 2 else None, prop_token[3] if len(prop_token) > 3 else None)
+            base = BinaryOpNode(base, '.', prop_node)
         # Fonksiyon çağrısı mı, index erişimi mi?
         if stream.peek() and stream.peek()[0] == 'LPAREN':
             stream.consume('LPAREN')
@@ -321,7 +391,9 @@ def parse_factor(stream):
     elif token[0] == 'KEYWORD' and token[1] == 'input':
         return parse_input_expression(stream)
     else:
-        raise Exception(f"Invalid factor: {token}")
+        line = token[2] if token and len(token) > 2 else '?'
+        column = token[3] if token and len(token) > 3 else '?'
+        raise Exception(f"[Line {line}, Column {column}] Syntax Error: Invalid expression or value near {token}")
 # ----------------------
 # Class Definition Parser (Temel)
 # ----------------------
@@ -385,7 +457,10 @@ def parse_class_block(stream):
                 name_token = stream.consume('ID')[1]
                 type_token = ' '.join(tokens) if tokens else None
             else:
-                raise Exception(f"Expected identifier after type in class body, got {stream.peek()}")
+                token = stream.peek()
+                line = token[2] if token and len(token) > 2 else '?'
+                column = token[3] if token and len(token) > 3 else '?'
+                raise Exception(f"[Line {line}, Column {column}] Syntax Error: Expected identifier after type in class body, got {token}")
             # Eğer isimden sonra doğrudan parantez geliyorsa: method
             if stream.peek()[0] == 'LPAREN':
                 func_is_constructor = False
@@ -458,7 +533,10 @@ def parse_class_block(stream):
                 stmts.append(FunctionDefNode(func_name, params, body, is_static, is_private, func_is_constructor or is_constructor))
                 continue
         else:
-            raise Exception(f"Expected type or identifier in class body, got {stream.peek()[0]}")
+            token = stream.peek()
+            line = token[2] if token and len(token) > 2 else '?'
+            column = token[3] if token and len(token) > 3 else '?'
+            raise Exception(f"[Line {line}, Column {column}] Syntax Error: Expected type or identifier in class body, got {token}")
 
         # Method mu property mi?
         if stream.peek()[0] == 'LPAREN':
@@ -493,8 +571,10 @@ def parse_class_block(stream):
             stream.consume('SEMI')
             stmts.append(VarDeclarationNode(type_token, name_token, None, is_static, is_private))
         else:
-            # Hatalı veya beklenmeyen durum
-            raise Exception(f"Unexpected token after class member name: {stream.peek()}")
+            token = stream.peek()
+            line = token[2] if token and len(token) > 2 else '?'
+            column = token[3] if token and len(token) > 3 else '?'
+            raise Exception(f"[Line {line}, Column {column}] Unexpected token after class member name: {token}")
     stream.consume('RBRACE')
     return BlockNode(stmts)
 
@@ -504,11 +584,31 @@ def parse_class_block(stream):
 # ----------------------
 def parse_variable_declaration(stream):
     var_type = stream.consume('TYPE')[1]
-    var_name = stream.consume('ID')[1]
-    stream.consume('OP')  # Expect '='
-    value = parse_expression(stream)
+    var_names = []
+    values = []
+    # Parse variable names (comma separated)
+    var_names.append(stream.consume('ID')[1])
+    while stream.peek() and stream.peek()[0] == 'COMMA':
+        stream.consume('COMMA')
+        var_names.append(stream.consume('ID')[1])
+    # Check for assignment
+    if stream.peek() and stream.peek()[0] == 'OP' and stream.peek()[1] == '=':
+        stream.consume('OP')
+        value = parse_expression(stream)
+        # Only last variable gets the value, others get None
+        for i in range(len(var_names)-1):
+            values.append(None)
+        values.append(value)
+    else:
+        # No assignment, all variables get None
+        for _ in var_names:
+            values.append(None)
     stream.consume('SEMI')  # Expect ';'
-    return VarDeclarationNode(var_type, var_name, value)
+    # Return list of VarDeclarationNode if multiple, else single
+    nodes = [VarDeclarationNode(var_type, name, val) for name, val in zip(var_names, values)]
+    if len(nodes) == 1:
+        return nodes[0]
+    return nodes
 
 def parse_print_statement(stream):
     stream.consume('KEYWORD')  # 'print'
@@ -523,7 +623,9 @@ def parse_variable_declaration_inline(stream):
     var_name = stream.consume('ID')[1]
     op = stream.consume('OP')
     if op[1] != '=':
-        raise Exception(f"Expected '=' in inline variable declaration, got {op[1]}")
+        line = op[2] if len(op) > 2 else '?'
+        column = op[3] if len(op) > 3 else '?'
+        raise Exception(f"[Line {line}, Column {column}] Syntax Error: Expected '=' in inline variable declaration, got '{op[1]}'")
     value = parse_expression(stream)
     return VarDeclarationNode(var_type, var_name, value)
 
@@ -593,9 +695,14 @@ def parse_if_statement(stream):
                 stream.consume('SEMI')
                 stmt = expr
             else:
-                raise Exception(f"Unexpected token after inline if: {stream.peek()}")
+                token_err = stream.peek()
+                line = token_err[2] if token_err and len(token_err) > 2 else '?'
+                column = token_err[3] if token_err and len(token_err) > 3 else '?'
+                raise Exception(f"[Line {line}, Column {column}] Unexpected token after inline if: {token_err}")
         else:
-            raise Exception(f"Unsupported inline if statement: {token}")
+            line = token[2] if token and len(token) > 2 else '?'
+            column = token[3] if token and len(token) > 3 else '?'
+            raise Exception(f"[Line {line}, Column {column}] Unsupported inline if statement: {token}")
         then_block = BlockNode([stmt])
 
     else_block = None
@@ -630,9 +737,14 @@ def parse_if_statement(stream):
                     stream.consume('SEMI')
                     stmt = expr
                 else:
-                    raise Exception(f"Unexpected token after inline else: {stream.peek()}")
+                    token_err = stream.peek()
+                    line = token_err[2] if token_err and len(token_err) > 2 else '?'
+                    column = token_err[3] if token_err and len(token_err) > 3 else '?'
+                    raise Exception(f"[Line {line}, Column {column}] Unexpected token after inline else: {token_err}")
             else:
-                raise Exception(f"Unsupported inline else statement: {token}")
+                line = token[2] if token and len(token) > 2 else '?'
+                column = token[3] if token and len(token) > 3 else '?'
+                raise Exception(f"[Line {line}, Column {column}] Unsupported inline else statement: {token}")
             else_block = BlockNode([stmt])
     return IfNode(condition, then_block, else_block)
 
@@ -729,7 +841,10 @@ def parse_block(stream):
         token = stream.peek()
         if token[0] == 'TYPE':
             node = parse_variable_declaration(stream)
-            statements.append(node)
+            if isinstance(node, list):
+                statements.extend(node)
+            else:
+                statements.append(node)
         elif token[0] == 'KEYWORD' and token[1] == 'print':
             node = parse_print_statement(stream)
             statements.append(node)
@@ -771,7 +886,10 @@ def parse_block(stream):
                 stream.consume('SEMI')
                 statements.append(expr)
             else:
-                raise Exception(f"Unexpected token in block after expression: {stream.peek()}")
+                token_err = stream.peek()
+                line = token_err[2] if token_err and len(token_err) > 2 else '?'
+                column = token_err[3] if token_err and len(token_err) > 3 else '?'
+                raise Exception(f"[Line {line}, Column {column}] Unexpected token in block after expression: {token_err}")
         elif token[0] == 'KEYWORD' and token[1] == 'for' and is_for_each_syntax(stream):
             node = parse_for_each_statement(stream)
             statements.append(node)
@@ -779,7 +897,9 @@ def parse_block(stream):
             node = parse_for_statement(stream)
             statements.append(node)
         else:
-            raise Exception(f"Unexpected token in block: {token}")
+            line = token[2] if token and len(token) > 2 else '?'
+            column = token[3] if token and len(token) > 3 else '?'
+            raise Exception(f"[Line {line}, Column {column}] Unexpected token in block: {token}")
     stream.consume('RBRACE')
     return BlockNode(statements)
 
@@ -792,44 +912,61 @@ def parse_program(tokens):
 
     while stream.peek():
         token = stream.peek()
+        # Yorum satırlarını atla (ID olarak gelirse ve '#' ile başlıyorsa)
+        if token[0] == 'ID' and str(token[1]).startswith('#'):
+            stream.position += 1
+            continue
         if token[0] == 'TYPE':
             node = parse_variable_declaration(stream)
-            ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'print':
+            if isinstance(node, list):
+                ast_nodes.extend(node)
+            else:
+                ast_nodes.append(node)
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'print':
             node = parse_print_statement(stream)
             ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'input':
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'input':
             node = parse_input_expression(stream)
             ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'if':
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'if':
             node = parse_if_statement(stream)
             ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'for' and is_for_each_syntax(stream):
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'for' and is_for_each_syntax(stream):
             node = parse_for_each_statement(stream)
             ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'for':
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'for':
             node = parse_for_statement(stream)
             ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'while':
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'while':
             node = parse_while_statement(stream)
             ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'return':
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'return':
             node = parse_return_statement(stream)
             ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'fn':
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'fn':
             node = parse_function_definition(stream)
             ast_nodes.append(node)
-        elif token[0] == 'KEYWORD' and token[1] == 'class':
+            continue
+        if token[0] == 'KEYWORD' and token[1] == 'class':
             node = parse_class_definition(stream)
             ast_nodes.append(node)
             # Class tanımı sonrası, bir sonraki statement'a kadar ilerle
             while stream.peek() and stream.peek()[0] not in ('TYPE', 'KEYWORD', 'ID'):
                 stream.position += 1
             continue
-        elif token[0] == 'KEYWORD' and token[1] == 'try':
+        if token[0] == 'KEYWORD' and token[1] == 'try':
             node = parse_try_catch_statement(stream)
             ast_nodes.append(node)
-        elif token[0] == 'ID' or (token[0] == 'KEYWORD' and token[1] == 'this'):
+            continue
+        if token[0] == 'ID' or (token[0] == 'KEYWORD' and token[1] == 'this'):
             # Zincirli property/method erişimi ve atama/fonksiyon çağrısı desteği
             expr = parse_expression(stream)
             if stream.peek() and stream.peek()[0] == 'OP' and stream.peek()[1] == '=':
@@ -838,14 +975,18 @@ def parse_program(tokens):
                 stream.consume('SEMI')
                 node = BinaryOpNode(expr, '=', value)
                 ast_nodes.append(node)
+                continue
             elif stream.peek() and stream.peek()[0] == 'SEMI':
                 stream.consume('SEMI')
                 ast_nodes.append(expr)
+                continue
             else:
-                raise Exception(f"Unexpected token in top-level after expression: {stream.peek()}")
-        else:
-            raise Exception(f"Unexpected token: {token}")
-
+                token_err = stream.peek()
+                line = token_err[2] if token_err and len(token_err) > 2 else '?'
+                column = token_err[3] if token_err and len(token_err) > 3 else '?'
+                raise Exception(f"[Line {line}, Column {column}] Unexpected token in top-level after expression: {token_err}")
+        # Yorum veya boş satır ise atla
+        stream.position += 1
     return ast_nodes
 
 

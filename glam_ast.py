@@ -1,3 +1,6 @@
+class MapNode:
+    def __init__(self, pairs):
+        self.pairs = pairs
 # AST (Abstract Syntax Tree) Node Definitions
 
 class VarDeclarationNode:
@@ -21,8 +24,10 @@ class StringNode:
         self.value = value
 
 class IdentifierNode:
-    def __init__(self, name):
+    def __init__(self, name, line=None, column=None):
         self.name = name
+        self.line = line
+        self.column = column
 
 class BinaryOpNode:
     def __init__(self, left, operator, right):

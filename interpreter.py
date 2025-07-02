@@ -19,6 +19,22 @@ class ReturnException(Exception):
 
 
 def evaluate(node, local_scope=None):
+    # Map/dictionary literal
+    if isinstance(node, MapNode):
+        scope = local_scope if local_scope is not None else memory
+        d = {}
+        for k, v in node.pairs:
+            d[k] = evaluate(v, scope)
+        return d
+
+    # Map index access: m["key"]
+    if isinstance(node, IndexAccessNode):
+        scope = local_scope if local_scope is not None else memory
+        container = evaluate(node.list_expr, scope)
+        idx = evaluate(node.index_expr, scope)
+        if isinstance(container, dict):
+            return container[idx]
+        return container[idx]
     # Try-catch error handling
     if isinstance(node, TryCatchNode):
         try:
@@ -172,7 +188,10 @@ def evaluate(node, local_scope=None):
         elif name in classes:
             return classes[name]
         else:
-            raise Exception(f"Undefined variable or class: {name}")
+            # Satır ve sütun numarası varsa, kullanıcı dostu hata mesajı ver
+            line = getattr(node, 'line', '?')
+            column = getattr(node, 'column', '?')
+            raise Exception(f"[Line {line}, Column {column}] Name Error: Undefined variable or class '{name}'")
 
     # Property/method/static access: p.x, p.foo, ClassName.staticX, ClassName.staticFoo, string method/property
     elif isinstance(node, BinaryOpNode) and node.operator == '.':
@@ -224,20 +243,37 @@ def evaluate(node, local_scope=None):
                 return ('__staticmethod__', class_def, class_def.__static_methods__[prop])
         raise Exception(f"Property or method '{prop}' not found on object or class")
 
-    # String method call support: "abc".substring(1, 2)
+    # String method call support: "abc".substring(1, 2), toUpperCase, toLowerCase, contains, replace
     elif isinstance(node, FunctionCallNode) and isinstance(node.name, BinaryOpNode) and node.name.operator == '.':
         left_val = evaluate(node.name.left, scope)
         method = node.name.right.name
         if isinstance(left_val, str):
+            args = [evaluate(arg, scope) for arg in node.args]
             if method == 'substring':
-                args = [evaluate(arg, scope) for arg in node.args]
                 if len(args) == 1:
                     return left_val[args[0]:]
                 elif len(args) == 2:
                     return left_val[args[0]:args[1]]
                 else:
                     raise Exception('substring() expects 1 or 2 arguments')
-            raise Exception(f"Unknown string method: {method}")
+            elif method == 'toUpperCase':
+                if len(args) != 0:
+                    raise Exception('toUpperCase() expects no arguments')
+                return left_val.upper()
+            elif method == 'toLowerCase':
+                if len(args) != 0:
+                    raise Exception('toLowerCase() expects no arguments')
+                return left_val.lower()
+            elif method == 'contains':
+                if len(args) != 1:
+                    raise Exception('contains() expects 1 argument')
+                return args[0] in left_val
+            elif method == 'replace':
+                if len(args) != 2:
+                    raise Exception('replace() expects 2 arguments')
+                return left_val.replace(str(args[0]), str(args[1]))
+            else:
+                raise Exception(f"Unknown string method: {method}")
         # Instance property/method
         if isinstance(left_val, dict):
             # Access control: private property/method dışarıdan erişilemez
@@ -280,6 +316,9 @@ def evaluate(node, local_scope=None):
         raise Exception(f"Property or method '{prop}' not found on object or class")
 
     elif isinstance(node, BinaryOpNode):
+        # Satır ve sütun numarası yakala (varsa)
+        line = getattr(node, 'line', '?')
+        column = getattr(node, 'column', '?')
         op = node.operator
         # Assignment as expression: x = expr, or array index assignment
         if op == '=':
@@ -311,54 +350,88 @@ def evaluate(node, local_scope=None):
             value = evaluate(node.right, scope)
             scope[node.left.name] = value
             return value
+
         left = evaluate(node.left, scope)
         right = evaluate(node.right, scope)
-        if op == '+':
-            # String birleştirme desteği
-            if isinstance(left, str) or isinstance(right, str):
-                return str(left) + str(right)
-            return left + right
-        elif op == '-':
-            return left - right
-        elif op == '*':
-            return left * right
-        elif op == '/':
-            return left / right
-        elif op == '^':
-            return left ** right
-        elif op == '==':
-            return left == right
-        elif op == '!=':
-            return left != right
-        elif op == '<':
-            return left < right
-        elif op == '<=':
-            return left <= right
-        elif op == '>':
-            return left > right
-        elif op == '>=':
-            return left >= right
-        elif op in ('and', '&&'):
-            return bool(left) and bool(right)
-        elif op in ('or', '||'):
-            return bool(left) or bool(right)
+
+        # --- Otomatik tip dönüşümü: Karşılaştırmalarda input'tan gelen string sayısal ise dönüştür ---
+        def auto_convert(val, other):
+            # Eğer val string ve other int/float ise, val'ı dönüştür
+            if isinstance(val, str):
+                if isinstance(other, int):
+                    try:
+                        return int(val)
+                    except Exception:
+                        pass
+                elif isinstance(other, float):
+                    try:
+                        return float(val)
+                    except Exception:
+                        pass
+            return val
+
+        # Sadece karşılaştırma ve aritmetik işlemlerde uygula
+        if op in ('==', '!=', '<', '<=', '>', '>=', '+', '-', '*', '/', '^'):
+            # Her iki tarafı da uygun şekilde dönüştür
+            left_conv = auto_convert(left, right)
+            right_conv = auto_convert(right, left)
         else:
-            raise Exception(f"Unknown operator: {op}")
+            left_conv = left
+            right_conv = right
+
+        try:
+            if op == '+':
+                # String birleştirme desteği
+                if isinstance(left_conv, str) or isinstance(right_conv, str):
+                    return str(left_conv) + str(right_conv)
+                return left_conv + right_conv
+            elif op == '-':
+                return left_conv - right_conv
+            elif op == '*':
+                return left_conv * right_conv
+            elif op == '/':
+                return left_conv / right_conv
+            elif op == '^':
+                return left_conv ** right_conv
+            elif op == '==':
+                return left_conv == right_conv
+            elif op == '!=':
+                return left_conv != right_conv
+            elif op == '<':
+                return left_conv < right_conv
+            elif op == '<=':
+                return left_conv <= right_conv
+            elif op == '>':
+                return left_conv > right_conv
+            elif op == '>=':
+                return left_conv >= right_conv
+            elif op in ('and', '&&'):
+                return bool(left) and bool(right)
+            elif op in ('or', '||'):
+                return bool(left) or bool(right)
+            else:
+                raise Exception(f"Unknown operator: {op}")
+        except Exception as e:
+            raise Exception(f"[Line {line}, Column {column}] Runtime Error: {str(e)}")
 
     elif isinstance(node, VarDeclarationNode):
-        value = evaluate(node.value, scope)
-        # Otomatik tip dönüşümü: int x = input(); gibi durumlar için
-        if hasattr(node, 'var_type'):
-            if node.var_type == 'int' and isinstance(value, str):
-                try:
-                    value = int(value)
-                except Exception:
-                    raise Exception(f"Cannot convert input to int: {value}")
-            elif node.var_type == 'float' and isinstance(value, str):
-                try:
-                    value = float(value)
-                except Exception:
-                    raise Exception(f"Cannot convert input to float: {value}")
+        if node.value is not None:
+            value = evaluate(node.value, scope)
+            # Otomatik tip dönüşümü: int x = input(); gibi durumlar için
+            if hasattr(node, 'var_type'):
+                # input fonksiyonu sonucu ise ve tip int/float ise dönüştür
+                if node.var_type == 'int' and isinstance(value, str):
+                    try:
+                        value = int(value)
+                    except Exception:
+                        raise Exception(f"Cannot convert input to int: {value}")
+                elif node.var_type == 'float' and isinstance(value, str):
+                    try:
+                        value = float(value)
+                    except Exception:
+                        raise Exception(f"Cannot convert input to float: {value}")
+        else:
+            value = None
         scope[node.name] = value
 
     elif isinstance(node, PrintNode):

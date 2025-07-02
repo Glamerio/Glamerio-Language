@@ -1,7 +1,17 @@
+# Dictionary/map testleri
+map ogrenci = {"ad": "Ali", "no": 123, "not": 95};
+print(ogrenci["ad"]);
+print(ogrenci["no"]);
+print(ogrenci["not"]);
+ogrenci["not"] = 100;
+print(ogrenci["not"]);
 
-// String işlemleri testleri
-s = "abcdef";
-print("length: " + s.length);
-print("substring(1, 4): " + s.substring(1, 4));
-print("substring(2): " + s.substring(2));
-print("concat: " + ("abc" + "def"));
+# String fonksiyonları testleri
+str s = "Glamerio Test";
+print(s.toUpperCase());
+print(s.toLowerCase());
+print(s.substring(3));
+print(s.substring(0, 7));
+print(s.contains("Test"));
+print(s.contains("test"));
+print(s.replace("Test", "Language"));

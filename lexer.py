@@ -11,7 +11,7 @@ TOKENS = [
     ('LOGIC', r'\b(and|or)\b'),
 
     # Data types
-    ('TYPE', r'\b(int|float|str|bool|array|void)\b'),
+    ('TYPE', r'\b(int|float|str|bool|array|void|map)\b'),
 
     # Boolean & null values
     ('BOOL', r'\b(True|False)\b'),
@@ -41,6 +41,8 @@ TOKENS = [
     # Operators (add && and ||)
     ('OP', r'\^|==|!=|<=|>=|=|<|>|\+|\-|\*|\/|&&|\|\|'),
 
+    # Colon for map/dictionary literals
+    ('COLON', r':'),
 
     # Whitespace and comments (ignored)
     ('NEWLINE', r'\n'),
@@ -79,12 +81,13 @@ def lexer(code):
         kind = match.lastgroup
         value = match.group()
         start = match.start()
-        # Satır numarasını bul
+        # Satır ve sütun numarasını bul
         line = 1
         for i, ls in enumerate(line_starts):
             if start < ls:
                 break
             line = i + 1
+        column = start - line_starts[line - 1] + 1
 
         # Skip whitespace, newlines, and comments
         if kind in ('NEWLINE', 'SKIP', 'COMMENT_SLASH', 'COMMENT_HASH', 'COMMENT_BLOCK'):
@@ -94,17 +97,6 @@ def lexer(code):
         if kind == 'STRING':
             value = value[1:-1]
 
-        tokens.append((kind, value, line))
+        tokens.append((kind, value, line, column))
 
     return tokens
-
-# Example usage: run with test file
-if __name__ == "__main__":
-    try:
-        with open('program.gl', 'r', encoding='utf-8') as f:
-            code = f.read()
-        token_list = lexer(code)
-        for token in token_list:
-            print(token)
-    except FileNotFoundError:
-        print("Error: 'program.gl' file not found.")

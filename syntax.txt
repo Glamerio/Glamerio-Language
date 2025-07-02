@@ -1,141 +1,120 @@
+
 # =========================================
 #              Glamerio Language
-#           Syntax Definition File
+#           Syntax & Features
 # =========================================
 
 # -------------------------------
-# LANGUAGE INFO
+# BASICS
 # -------------------------------
-# Language Name   : Glamerio
-# File Extension  : .gl
-# Single-line Comment : starts with #
-# Inline comment        : ends with #
-# Statement End         : every line ends with ;
+# File extension: .gl
+# Statement end: ;
+# Single-line comment: #
+# Multi-line comment: /* ... */
 
 # -------------------------------
 # DATA TYPES
 # -------------------------------
-int      # Integer
-float    # Floating point number
-string   # A universe where String is a variable type :)
-bool     # Boolean (True / False)
-
-# -------------------------------
-# SPECIAL VALUES
-# -------------------------------
-Null     # Null value
-True     # Boolean true
-False    # Boolean false
-\n       # Newline character in strings
+int, float, str, bool, map, var
 
 # -------------------------------
 # VARIABLE DECLARATION
 # -------------------------------
 int x = 5;
 float y = 3.14;
-string z = "Hello";
-bool b = True;
+str z = "Hello";
+bool b = true;
+var autoType = 42;
+var emptyVar;
 
 # -------------------------------
-# INPUT / OUTPUT
+# MAP/DICTIONARY
 # -------------------------------
-input();                             # Get user input
-string name = input("What is your name?");  # Prompted input
-
-print(x);                            # Print to screen
-print("Hello " + name + "!");        # String concatenation
+map student = {"name": "Ali", "id": 123, "grade": 95};
+print(student["name"]);
+student["grade"] = 100;
 
 # -------------------------------
-# ARITHMETIC OPERATORS
+# STRING FUNCTIONS
 # -------------------------------
-+  # Addition
--  # Subtraction
-*  # Multiplication
-/  # Division
+str s = "Glamerio Test";
+s.toUpperCase();
+s.toLowerCase();
+s.substring(3);
+s.substring(0, 7);
+s.contains("Test");
+s.replace("Test", "Language");
 
 # -------------------------------
-# COMPARISON OPERATORS
+# LOGICAL OPERATORS
 # -------------------------------
-==  # Equal
-!=  # Not equal
-<   # Less than
->   # Greater than
-<=  # Less than or equal
->=  # Greater than or equal
+&&, ||, !, ==, !=, <, >, <=, >=
 
 # -------------------------------
-# CONDITIONAL STATEMENTS
+# CONDITIONALS
 # -------------------------------
-if (x > 10) {
-    print("Greater");
-} else if (x == 10) {
-    print("Equal");
+if (age > 18) {
+    print("Adult");
 } else {
-    print("Smaller");
+    print("Child");
 }
+print(age > 18 ? "Adult" : "Child"); # Inline if
 
 # -------------------------------
 # LOOPS
 # -------------------------------
-# You can define a new variable directly in the condition
-while (int i < 5) {
+for (int i = 0; i < 5; i = i + 1) {
     print(i);
-    i = i + 1;
 }
-
-# For loop: init, condition, increment
-for (int i = 0; i < 10; i++) {
-    print(i);
+tuple numbers = [1, 2, 3];
+for (var n in numbers) {
+    print(n);
 }
 
 # -------------------------------
 # FUNCTIONS
 # -------------------------------
-fn add(a, b) {
+def sum(int a, int b) {
     return a + b;
 }
+print(sum(3, 5));
 
-int result = add(3, 5);
-print(result);
+def greet(str name = "World") {
+    print("Hello, " + name);
+}
+greet();
+greet("Ali");
 
 # -------------------------------
-# CLASSES
+# CLASSES & OOP
 # -------------------------------
 class Car {
-    string brand;
-    int speed = 0;
-
-    fn accelerate() {
-        speed = speed + 10;
-    }
-
-    fn showInfo() {
-        print("Brand: " + brand + ", Speed: " + speed);
+    str brand;
+    int year;
+    def start() {
+        print(brand + " is running");
     }
 }
-
-# Object creation and usage
-Car c;
-c.brand = "Toyota";
-c.accelerate();
-c.showInfo();
+Car c = new Car();
+c.brand = "BMW";
+c.year = 2020;
+c.start();
 
 # -------------------------------
-# OBJECT REFERENCE
+# TRY-CATCH
 # -------------------------------
-this.brand = "BMW";  # Accessing member inside the class
-
-# -------------------------------
-# OTHER EXAMPLES
-# -------------------------------
-# Re-assigning a variable
-x = 15;
-
-# Variable inside function
-fn greet(name) {
-    string message = "Hello " + name;
-    print(message);
+try {
+    int x = 5 / 0;
+} catch (e) {
+    print("Error: " + e);
 }
 
-# Returning a value
-return message;
+# -------------------------------
+# OTHER
+# -------------------------------
+- Automatic type conversion
+- User-friendly error messages
+- Multiple/empty variable declaration
+- Map functions (optional): keys(), values(), hasKey(), remove()
+
+# For more examples, see test_cases.gl
