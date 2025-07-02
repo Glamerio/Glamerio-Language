@@ -1,0 +1,7 @@
+
+// String işlemleri testleri
+s = "abcdef";
+print("length: " + s.length);
+print("substring(1, 4): " + s.substring(1, 4));
+print("substring(2): " + s.substring(2));
+print("concat: " + ("abc" + "def"));

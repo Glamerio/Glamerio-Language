@@ -5,10 +5,13 @@ import re
 
 TOKENS = [
     # Keywords
-    ('KEYWORD', r'\b(fn|if|else|for|while|class|return|input|print|this)\b'),
+    ('KEYWORD', r'\b(fn|if|else|elseif|for|while|class|return|input|print|this|static|private|public|constructor|new|try|catch|in)\b'),
+
+    # Logical operators as keywords (and/or)
+    ('LOGIC', r'\b(and|or)\b'),
 
     # Data types
-    ('TYPE', r'\b(int|float|str|bool)\b'),
+    ('TYPE', r'\b(int|float|str|bool|array|void)\b'),
 
     # Boolean & null values
     ('BOOL', r'\b(True|False)\b'),
@@ -35,35 +38,63 @@ TOKENS = [
     ('LBRACKET', r'\['),
     ('RBRACKET', r'\]'),
     
-    # Operators
-    ('OP', r'\^|==|!=|<=|>=|=|<|>|\+|\-|\*|\/'),
+    # Operators (add && and ||)
+    ('OP', r'\^|==|!=|<=|>=|=|<|>|\+|\-|\*|\/|&&|\|\|'),
 
 
     # Whitespace and comments (ignored)
     ('NEWLINE', r'\n'),
     ('SKIP', r'[ \t]+'),
-    ('COMMENT', r'\#.*')
+    # Single-line comment: // ...
+    ('COMMENT_SLASH', r'//.*'),
+    # Hash comment: # ...
+    ('COMMENT_HASH', r'\#.*'),
+    # Multi-line comment: /* ... */
+    ('COMMENT_BLOCK', r'/\*[\s\S]*?\*/')
 ]
 
-# Compile all regexes into a single pattern
+
+# Yorumları (// ve #) satırın herhangi bir yerinde algılamak için kodu ön işle
+def remove_comments(code):
+    import re
+    # Remove /* ... */
+    code = re.sub(r'/\*[\s\S]*?\*/', '', code)
+    # Remove // ... (from // to end of line)
+    code = re.sub(r'//.*', '', code)
+    # Remove # ... (from # to end of line)
+    code = re.sub(r'#.*', '', code)
+    return code
+
 TOKEN_RE = re.compile('|'.join(f'(?P<{name}>{pattern})' for name, pattern in TOKENS))
 
 # Lexer function
 def lexer(code):
     tokens = []
+    code = remove_comments(code)
+    line_starts = [0]
+    for i, c in enumerate(code):
+        if c == '\n':
+            line_starts.append(i + 1)
     for match in TOKEN_RE.finditer(code):
         kind = match.lastgroup
         value = match.group()
+        start = match.start()
+        # Satır numarasını bul
+        line = 1
+        for i, ls in enumerate(line_starts):
+            if start < ls:
+                break
+            line = i + 1
 
         # Skip whitespace, newlines, and comments
-        if kind in ('NEWLINE', 'SKIP', 'COMMENT'):
+        if kind in ('NEWLINE', 'SKIP', 'COMMENT_SLASH', 'COMMENT_HASH', 'COMMENT_BLOCK'):
             continue
 
         # Remove quotes from strings
         if kind == 'STRING':
             value = value[1:-1]
 
-        tokens.append((kind, value))
+        tokens.append((kind, value, line))
 
     return tokens
 
